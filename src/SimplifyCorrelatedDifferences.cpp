@@ -188,6 +188,7 @@ class SimplifyCorrelatedDifferences : public IRMutator {
                     rewrite(max(x, c0) - min(x, c1), max(max(c0 - x, x - c1), fold(max(0, c0 - c1)))) ||
                     rewrite(min(x, y) - max(x, z), min(min(x, y) - max(x, z), 0)) ||
                     rewrite(max(x, y) - min(x, z), max(max(x, y) - min(x, z), 0)) ||
+
                     false) {
                     return rewrite.result;
                 }
@@ -198,10 +199,14 @@ class SimplifyCorrelatedDifferences : public IRMutator {
 
     template<typename T>
     Expr visit_add_or_sub(const T *op) {
-        if (op->type != Int(32)) {
+        if (op->type != Int(32) || loop_var.empty()) {
             return IRMutator::visit(op);
         }
         Expr e = IRMutator::visit(op);
+        op = e.as<T>();
+        if (!op) {
+            return e;
+        }
         auto ma = is_monotonic(op->a, loop_var, monotonic);
         auto mb = is_monotonic(op->b, loop_var, monotonic);
 
@@ -230,14 +235,15 @@ class SimplifyCorrelatedDifferences : public IRMutator {
             e = PartiallyCancelDifferences().mutate(e);
             e = simplify(e);
 
-            if ((debug::debug_level() >= 0) &&
+            if ((debug::debug_level() > 0) &&
                 is_monotonic(e, loop_var, monotonic) == Monotonic::Unknown) {
                 // Might be a missed simplification opportunity. Log to help improve the simplifier.
                 NormalizeVarNames n;
                 Expr normalized_var = n.mutate(Variable::make(Int(32), loop_var));
                 Expr normalized = n.mutate(e);
                 debug(0) << "Warning: expression is non-monotonic in loop variable "
-                         << normalized_var << ":\n " << normalized << "\n";
+                         << normalized_var << ":\n " << normalized << "\n"
+                         << loop_var << ": " << e << "\n";
             }
         }
         return e;
