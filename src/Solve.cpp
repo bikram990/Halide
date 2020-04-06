@@ -141,6 +141,8 @@ private:
         const Sub *sub_b = b.as<Sub>();
         const Mul *mul_a = a.as<Mul>();
         const Mul *mul_b = b.as<Mul>();
+        const Div *div_a = a.as<Div>();
+        const Div *div_b = b.as<Div>();
 
         Expr expr;
 
@@ -179,6 +181,12 @@ private:
             } else if (mul_b && equal(mul_b->a, a)) {
                 // f(x) + f(x)*a -> f(x) * (a + 1)
                 expr = mutate(a * (mul_b->b + 1));
+            } else if (div_a && !a_failed) {
+                // f(x)/a + g(x) -> (f(x) + g(x) * a) / b
+                expr = mutate((div_a->a + b * div_a->b) / div_a->b);
+            } else if (div_b && !b_failed) {
+                // f(x) + g(x)/b -> (f(x) * b + g(x)) / b
+                expr = mutate((a * div_b->b + div_b->a) / div_b->b);
             } else {
                 expr = fail(a + b);
             }
@@ -222,6 +230,7 @@ private:
         const Sub *sub_b = b.as<Sub>();
         const Mul *mul_a = a.as<Mul>();
         const Mul *mul_b = b.as<Mul>();
+        const Div *div_a = a.as<Div>();
 
         Expr expr;
 
@@ -271,6 +280,9 @@ private:
             } else if (mul_a && mul_b && equal(mul_a->b, mul_b->b)) {
                 // f(x)*a - g(x)*a -> (f(x) - g(x))*a;
                 expr = mutate((mul_a->a - mul_b->a) * mul_a->b);
+            } else if (div_a && !a_failed) {
+                // f(x)/a - g(x) -> (f(x) - g(x) * a) / b
+                expr = mutate((div_a->a - b * div_a->b) / div_a->b);
             } else {
                 expr = fail(a - b);
             }
